@@ -1,9 +1,20 @@
 import * as THREE from '../libs/three.module.js';
-import { PointerLockControls } from '../libs/PointerLockControls.js';
 
-/* =========================
-   CENA / CAMERA / RENDER
-========================= */
+/* ================= CONFIG ================= */
+
+const ROOM_SIZE = 10;
+const ROOM_HEIGHT = 4;
+const WALL_THICKNESS = 0.4;
+
+const DOOR_WIDTH = 3;
+const CORRIDOR_LENGTH = 8;
+const CORRIDOR_WIDTH = DOOR_WIDTH;
+
+const PLAYER_RADIUS = 0.4;
+const SPEED = 5;
+
+/* ================= SCENE ================= */
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x111111);
 
@@ -11,194 +22,190 @@ const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
   0.1,
-  1000
+  200
 );
+camera.position.set(-8, 1.7, -8);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-/* =========================
-   CONTROLES
-========================= */
-const controls = new PointerLockControls(camera, document.body);
-document.body.addEventListener('click', () => controls.lock());
-scene.add(controls.getObject());
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
-camera.position.set(0, 1.6, 5);
+/* ================= TEXTURES ================= */
 
-/* =========================
-   LUZ
-========================= */
-scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-const light = new THREE.DirectionalLight(0xffffff, 0.6);
-light.position.set(10, 20, 10);
-scene.add(light);
+const loader = new THREE.TextureLoader();
 
-/* =========================
-   CHÃO
-========================= */
-const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(200, 200),
-  new THREE.MeshStandardMaterial({ color: 0x333333 })
-);
-floor.rotation.x = -Math.PI / 2;
-scene.add(floor);
+const wallTex = loader.load('../textures/stone_wall.jpg');
+wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping;
 
-/* =========================
-   COLISÕES
-========================= */
+const floorTex = loader.load('../textures/floor.jpg');
+floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
+
+const wallMat = new THREE.MeshStandardMaterial({ map: wallTex });
+const floorMat = new THREE.MeshStandardMaterial({ map: floorTex });
+
+/* ================= COLLISION ================= */
+
 const colliders = [];
 
-/* =========================
-   HELPERS
-========================= */
-function createWall(x, z, w, h = 3, d = 0.5) {
-  const wall = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshStandardMaterial({ color: 0x777777 })
-  );
-  wall.position.set(x, h / 2, z);
-  scene.add(wall);
-  colliders.push(wall);
+function addCollider(mesh) {
+  colliders.push(new THREE.Box3().setFromObject(mesh));
 }
 
-function createWallVertical(x, z, d, h = 3, w = 0.5) {
-  const wall = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshStandardMaterial({ color: 0x777777 })
-  );
-  wall.position.set(x, h / 2, z);
-  scene.add(wall);
-  colliders.push(wall);
+/* ================= HELPERS ================= */
+
+function floor(w, d, x, z) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), floorMat);
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(x, 0, z);
+  scene.add(m);
 }
 
-function createCorridor(x, z, w, d) {
-  const corridor = new THREE.Mesh(
-    new THREE.BoxGeometry(w, 2.5, d),
-    new THREE.MeshStandardMaterial({ color: 0x555555 })
-  );
-  corridor.position.set(x, 1.25, z);
-  scene.add(corridor);
-  colliders.push(corridor);
+function wall(w, h, d, x, z) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+  m.position.set(x, h / 2, z);
+  scene.add(m);
+  addCollider(m);
 }
 
-/* =========================
-   SALA
-========================= */
-class Room {
-  constructor(x, z, w, h) {
-    this.x = x;
-    this.z = z;
-    this.w = w;
-    this.h = h;
-    this.door = null;
+/* ================= ROOM ================= */
+
+function room(x, z, door) {
+  floor(ROOM_SIZE, ROOM_SIZE, x, z);
+
+  const half = ROOM_SIZE / 2;
+  const side = (ROOM_SIZE - DOOR_WIDTH) / 2;
+
+  // NORTH
+  if (door === 'n') {
+    wall(side, ROOM_HEIGHT, WALL_THICKNESS, x - (DOOR_WIDTH + side) / 2, z - half);
+    wall(side, ROOM_HEIGHT, WALL_THICKNESS, x + (DOOR_WIDTH + side) / 2, z - half);
+  } else {
+    wall(ROOM_SIZE, ROOM_HEIGHT, WALL_THICKNESS, x, z - half);
+  }
+
+  // SOUTH
+  if (door === 's') {
+    wall(side, ROOM_HEIGHT, WALL_THICKNESS, x - (DOOR_WIDTH + side) / 2, z + half);
+    wall(side, ROOM_HEIGHT, WALL_THICKNESS, x + (DOOR_WIDTH + side) / 2, z + half);
+  } else {
+    wall(ROOM_SIZE, ROOM_HEIGHT, WALL_THICKNESS, x, z + half);
+  }
+
+  // WEST
+  if (door === 'w') {
+    wall(WALL_THICKNESS, ROOM_HEIGHT, side, x - half, z - (DOOR_WIDTH + side) / 2);
+    wall(WALL_THICKNESS, ROOM_HEIGHT, side, x - half, z + (DOOR_WIDTH + side) / 2);
+  } else {
+    wall(WALL_THICKNESS, ROOM_HEIGHT, ROOM_SIZE, x - half, z);
+  }
+
+  // EAST
+  if (door === 'e') {
+    wall(WALL_THICKNESS, ROOM_HEIGHT, side, x + half, z - (DOOR_WIDTH + side) / 2);
+    wall(WALL_THICKNESS, ROOM_HEIGHT, side, x + half, z + (DOOR_WIDTH + side) / 2);
+  } else {
+    wall(WALL_THICKNESS, ROOM_HEIGHT, ROOM_SIZE, x + half, z);
   }
 }
 
-/* =========================
-   PORTA (CENTRO DA PAREDE)
-========================= */
-function createDoor(room) {
-  const side = Math.floor(Math.random() * 4); // 0 N | 1 S | 2 E | 3 W
+/* ================= CORRIDORS ================= */
 
-  switch (side) {
-    case 0:
-      room.door = { x: room.x, z: room.z - room.h / 2, dir: 'N' };
-      break;
-    case 1:
-      room.door = { x: room.x, z: room.z + room.h / 2, dir: 'S' };
-      break;
-    case 2:
-      room.door = { x: room.x + room.w / 2, z: room.z, dir: 'E' };
-      break;
-    case 3:
-      room.door = { x: room.x - room.w / 2, z: room.z, dir: 'W' };
-      break;
-  }
+function corridorH(x, z) {
+  floor(CORRIDOR_LENGTH, CORRIDOR_WIDTH, x, z);
+  wall(CORRIDOR_LENGTH, ROOM_HEIGHT, WALL_THICKNESS, x, z - CORRIDOR_WIDTH / 2);
+  wall(CORRIDOR_LENGTH, ROOM_HEIGHT, WALL_THICKNESS, x, z + CORRIDOR_WIDTH / 2);
 }
 
-/* =========================
-   CONSTRUIR SALA (4 PAREDES)
-========================= */
-function buildRoom(room) {
-  const t = 0.5;
-
-  // Norte
-  if (room.door.dir !== 'N')
-    createWall(room.x, room.z - room.h / 2, room.w);
-
-  // Sul
-  if (room.door.dir !== 'S')
-    createWall(room.x, room.z + room.h / 2, room.w);
-
-  // Leste
-  if (room.door.dir !== 'E')
-    createWallVertical(room.x + room.w / 2, room.z, room.h);
-
-  // Oeste
-  if (room.door.dir !== 'W')
-    createWallVertical(room.x - room.w / 2, room.z, room.h);
+function corridorV(x, z) {
+  floor(CORRIDOR_WIDTH, CORRIDOR_LENGTH, x, z);
+  wall(WALL_THICKNESS, ROOM_HEIGHT, CORRIDOR_LENGTH, x - CORRIDOR_WIDTH / 2, z);
+  wall(WALL_THICKNESS, ROOM_HEIGHT, CORRIDOR_LENGTH, x + CORRIDOR_WIDTH / 2, z);
 }
 
-/* =========================
-   CORREDOR CONECTADO À PORTA
-========================= */
-function buildCorridor(room) {
-  const len = 10;
-  const w = 2;
-  const d = room.door;
+/* ================= MAP (QUADRADO CORRETO) ================= */
 
-  switch (d.dir) {
-    case 'N':
-      createCorridor(d.x, d.z - len / 2, w, len);
-      break;
-    case 'S':
-      createCorridor(d.x, d.z + len / 2, w, len);
-      break;
-    case 'E':
-      createCorridor(d.x + len / 2, d.z, len, w);
-      break;
-    case 'W':
-      createCorridor(d.x - len / 2, d.z, len, w);
-      break;
-  }
-}
+const OFFSET = ROOM_SIZE / 2 + CORRIDOR_LENGTH / 2;
 
-/* =========================
-   GERAR MAPA
-========================= */
-const room = new Room(0, 0, 12, 10);
-createDoor(room);
-buildRoom(room);
-buildCorridor(room);
+room(-OFFSET, -OFFSET, 'e'); // sala superior esquerda
+room( OFFSET, -OFFSET, 'w'); // superior direita
+room(-OFFSET,  OFFSET, 'e'); // inferior esquerda
+room( OFFSET,  OFFSET, 'w'); // inferior direita
 
-/* =========================
-   MOVIMENTO
-========================= */
-const velocity = new THREE.Vector3();
-const direction = new THREE.Vector3();
+corridorH(0, -OFFSET);
+corridorH(0,  OFFSET);
+corridorV(-OFFSET, 0);
+corridorV( OFFSET, 0);
+
+/* ================= INPUT ================= */
+
 const keys = {};
-
 document.addEventListener('keydown', e => keys[e.code] = true);
 document.addEventListener('keyup', e => keys[e.code] = false);
 
-/* =========================
-   LOOP
-========================= */
+document.body.addEventListener('click', () => {
+  document.body.requestPointerLock();
+});
+
+let yaw = 0;
+let pitch = 0;
+
+document.addEventListener('mousemove', e => {
+  if (document.pointerLockElement !== document.body) return;
+  yaw -= e.movementX * 0.002;
+  pitch -= e.movementY * 0.002;
+  pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+});
+
+/* ================= MOVEMENT + COLLISION ================= */
+
+const clock = new THREE.Clock();
+
+function collides(pos) {
+  const box = new THREE.Box3(
+    new THREE.Vector3(pos.x - PLAYER_RADIUS, 0, pos.z - PLAYER_RADIUS),
+    new THREE.Vector3(pos.x + PLAYER_RADIUS, 2, pos.z + PLAYER_RADIUS)
+  );
+  return colliders.some(c => c.intersectsBox(box));
+}
+
+function update(dt) {
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+  dir.y = 0;
+  dir.normalize();
+
+  const right = new THREE.Vector3().crossVectors(dir, camera.up).normalize();
+  const vel = new THREE.Vector3();
+
+  if (keys.KeyW) vel.add(dir);
+  if (keys.KeyS) vel.sub(dir);
+  if (keys.KeyA) vel.sub(right);
+  if (keys.KeyD) vel.add(right);
+
+  if (vel.lengthSq()) {
+    vel.normalize().multiplyScalar(SPEED * dt);
+
+    const nx = camera.position.clone();
+    nx.x += vel.x;
+    if (!collides(nx)) camera.position.x = nx.x;
+
+    const nz = camera.position.clone();
+    nz.z += vel.z;
+    if (!collides(nz)) camera.position.z = nz.z;
+  }
+
+  camera.rotation.order = 'YXZ';
+  camera.rotation.y = yaw;
+  camera.rotation.x = pitch;
+}
+
+/* ================= LOOP ================= */
+
 function animate() {
   requestAnimationFrame(animate);
-
-  direction.set(0, 0, 0);
-  if (keys['KeyW']) direction.z -= 1;
-  if (keys['KeyS']) direction.z += 1;
-  if (keys['KeyA']) direction.x -= 1;
-  if (keys['KeyD']) direction.x += 1;
-  direction.normalize();
-
-  controls.moveRight(direction.x * 0.08);
-  controls.moveForward(direction.z * 0.08);
-
+  update(clock.getDelta());
   renderer.render(scene, camera);
 }
 
