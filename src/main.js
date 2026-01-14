@@ -4,32 +4,27 @@ import * as THREE from '../libs/three.module.js';
 // Cena
 // ======================================================
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x101010);
+scene.background = new THREE.Color(0x111111);
 
 // ======================================================
 // Câmera
 // ======================================================
-const camera = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  500
-);
-camera.position.set(0, 1.7, 0);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 300);
+camera.position.set(-6, 1.7, -6);
 
 // ======================================================
-// Renderer (sem sombras)
+// Renderer (leve, sem sombras)
 // ======================================================
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // ======================================================
-// Luz (leve)
+// Luz simples
 // ======================================================
-scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-const light = new THREE.PointLight(0xffffff, 0.8);
-light.position.set(0, 10, 0);
+scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+const light = new THREE.PointLight(0xffffff, 0.6);
+light.position.set(0, 8, 0);
 scene.add(light);
 
 // ======================================================
@@ -43,7 +38,7 @@ wallTex.repeat.set(2, 1);
 
 const floorTex = loader.load('../textures/floor.jpg');
 floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
-floorTex.repeat.set(6, 6);
+floorTex.repeat.set(10, 10);
 
 // ======================================================
 // Materiais
@@ -55,92 +50,59 @@ const floorMat = new THREE.MeshStandardMaterial({ map: floorTex });
 // Colisão
 // ======================================================
 const colliders = [];
-const playerRadius = 0.4;
+const PLAYER_RADIUS = 0.4;
 
 // ======================================================
 // Helpers
 // ======================================================
-function createFloor(w, d, x, z) {
-  const f = new THREE.Mesh(
-    new THREE.PlaneGeometry(w, d),
-    floorMat
-  );
-  f.rotation.x = -Math.PI / 2;
-  f.position.set(x, 0, z);
-  scene.add(f);
+function floor(w, d, x, z) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), floorMat);
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(x, 0, z);
+  scene.add(m);
 }
 
-function createWall(w, h, d, x, z) {
-  const m = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    wallMat
-  );
+function wall(w, h, d, x, z) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
   m.position.set(x, h / 2, z);
   scene.add(m);
-
   colliders.push(new THREE.Box3().setFromObject(m));
 }
 
 // ======================================================
-// Dimensões base
+// Dimensões globais (grade)
 // ======================================================
 const ROOM = 10;
-const CORRIDOR_W = 4;
+const CORR = 4;
 const WALL = 0.5;
 const H = 4;
 
-// Distância entre centros das salas
-const GAP = ROOM + CORRIDOR_W;
-
-// Coordenadas das salas (quadrado perfeito)
-const S1 = [-GAP / 2, -GAP / 2];
-const S2 = [ GAP / 2, -GAP / 2];
-const S3 = [-GAP / 2,  GAP / 2];
-const S4 = [ GAP / 2,  GAP / 2];
+const TOTAL = ROOM * 2 + CORR;
 
 // ======================================================
-// Função sala fechada
+// Chão completo (quadrado único)
 // ======================================================
-function createRoom(cx, cz) {
-  createFloor(ROOM, ROOM, cx, cz);
-
-  createWall(ROOM, H, WALL, cx, cz - ROOM / 2);
-  createWall(ROOM, H, WALL, cx, cz + ROOM / 2);
-  createWall(WALL, H, ROOM, cx - ROOM / 2, cz);
-  createWall(WALL, H, ROOM, cx + ROOM / 2, cz);
-}
+floor(TOTAL, TOTAL, 0, 0);
 
 // ======================================================
-// Salas
+// Paredes externas (quadrado perfeito)
 // ======================================================
-createRoom(...S1);
-createRoom(...S2);
-createRoom(...S3);
-createRoom(...S4);
+wall(TOTAL, H, WALL, 0, -TOTAL / 2);
+wall(TOTAL, H, WALL, 0,  TOTAL / 2);
+wall(WALL,  H, TOTAL, -TOTAL / 2, 0);
+wall(WALL,  H, TOTAL,  TOTAL / 2, 0);
 
 // ======================================================
-// Corredores horizontais
+// Paredes internas (salas)
 // ======================================================
-createFloor(CORRIDOR_W, ROOM / 2, 0, S1[1]);
-createFloor(CORRIDOR_W, ROOM / 2, 0, S3[1]);
 
-// Paredes dos corredores horizontais
-createWall(CORRIDOR_W, H, WALL, 0, S1[1] - ROOM / 4);
-createWall(CORRIDOR_W, H, WALL, 0, S1[1] + ROOM / 4);
-createWall(CORRIDOR_W, H, WALL, 0, S3[1] - ROOM / 4);
-createWall(CORRIDOR_W, H, WALL, 0, S3[1] + ROOM / 4);
+// Horizontais
+wall(TOTAL - ROOM, H, WALL, 0, -CORR / 2);
+wall(TOTAL - ROOM, H, WALL, 0,  CORR / 2);
 
-// ======================================================
-// Corredores verticais
-// ======================================================
-createFloor(ROOM / 2, CORRIDOR_W, S1[0], 0);
-createFloor(ROOM / 2, CORRIDOR_W, S2[0], 0);
-
-// Paredes dos corredores verticais
-createWall(WALL, H, CORRIDOR_W, S1[0] - ROOM / 4, 0);
-createWall(WALL, H, CORRIDOR_W, S1[0] + ROOM / 4, 0);
-createWall(WALL, H, CORRIDOR_W, S2[0] - ROOM / 4, 0);
-createWall(WALL, H, CORRIDOR_W, S2[0] + ROOM / 4, 0);
+// Verticais
+wall(WALL, H, TOTAL - ROOM, -CORR / 2, 0);
+wall(WALL, H, TOTAL - ROOM,  CORR / 2, 0);
 
 // ======================================================
 // Input
@@ -149,17 +111,12 @@ const keys = {};
 document.addEventListener('keydown', e => keys[e.code] = true);
 document.addEventListener('keyup', e => keys[e.code] = false);
 
-document.body.addEventListener('click', () => {
-  document.body.requestPointerLock();
-});
+document.body.addEventListener('click', () => document.body.requestPointerLock());
 
 // Mouse look
-let yaw = 0;
-let pitch = 0;
-
+let yaw = 0, pitch = 0;
 document.addEventListener('mousemove', e => {
   if (document.pointerLockElement !== document.body) return;
-
   yaw -= e.movementX * 0.002;
   pitch -= e.movementY * 0.002;
   pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
@@ -170,18 +127,17 @@ document.addEventListener('mousemove', e => {
 // ======================================================
 function collides(pos) {
   const box = new THREE.Box3(
-    new THREE.Vector3(pos.x - playerRadius, 0, pos.z - playerRadius),
-    new THREE.Vector3(pos.x + playerRadius, 2, pos.z + playerRadius)
+    new THREE.Vector3(pos.x - PLAYER_RADIUS, 0, pos.z - PLAYER_RADIUS),
+    new THREE.Vector3(pos.x + PLAYER_RADIUS, 2, pos.z + PLAYER_RADIUS)
   );
-
   return colliders.some(c => c.intersectsBox(box));
 }
 
 // ======================================================
 // Movimento
 // ======================================================
-const speed = 5;
 const clock = new THREE.Clock();
+const SPEED = 5;
 
 function move(dt) {
   const dir = new THREE.Vector3();
@@ -198,8 +154,7 @@ function move(dt) {
   if (keys.KeyD) vel.add(right);
 
   if (!vel.lengthSq()) return;
-
-  vel.normalize().multiplyScalar(speed * dt);
+  vel.normalize().multiplyScalar(SPEED * dt);
 
   const nx = camera.position.clone();
   nx.x += vel.x;
