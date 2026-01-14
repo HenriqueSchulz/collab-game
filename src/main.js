@@ -1,5 +1,5 @@
 import * as THREE from '../libs/three.module.js';
-import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/controls/PointerLockControls.js';
+import { PointerLockControls } from '../libs/PointerLockControls.js';
 
 /* =========================
    CENA / CAMERA / RENDER
