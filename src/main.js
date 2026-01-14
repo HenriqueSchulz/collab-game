@@ -1,159 +1,205 @@
-import * as THREE from '../libs/three.module.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158/build/three.module.js';
+import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/controls/PointerLockControls.js';
 
-// =================== Cena ===================
+/* =========================
+   CENA / CAMERA / RENDER
+========================= */
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x111111);
 
-// =================== Câmera ===================
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
-camera.position.set(-12, 1.7, -12);
+const camera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
 
-// =================== Renderer ===================
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// =================== Luz ===================
-scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+/* =========================
+   CONTROLES
+========================= */
+const controls = new PointerLockControls(camera, document.body);
+document.body.addEventListener('click', () => controls.lock());
+scene.add(controls.getObject());
 
-// =================== Texturas ===================
-const loader = new THREE.TextureLoader();
-const wallTex = loader.load('../textures/stone_wall.jpg');
-wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping;
-const floorTex = loader.load('../textures/floor.jpg');
-floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
+camera.position.set(0, 1.6, 5);
 
-// =================== Materiais ===================
-const wallMat = new THREE.MeshStandardMaterial({ map: wallTex });
-const floorMat = new THREE.MeshStandardMaterial({ map: floorTex });
+/* =========================
+   LUZ
+========================= */
+scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+const light = new THREE.DirectionalLight(0xffffff, 0.6);
+light.position.set(10, 20, 10);
+scene.add(light);
 
-// =================== Colisão ===================
+/* =========================
+   CHÃO
+========================= */
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(200, 200),
+  new THREE.MeshStandardMaterial({ color: 0x333333 })
+);
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+
+/* =========================
+   COLISÕES
+========================= */
 const colliders = [];
-const PLAYER_RADIUS = 0.4;
 
-// =================== Helpers ===================
-function floor(w, d, x, z) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), floorMat);
-  m.rotation.x = -Math.PI / 2;
-  m.position.set(x, 0, z);
-  scene.add(m);
+/* =========================
+   HELPERS
+========================= */
+function createWall(x, z, w, h = 3, d = 0.5) {
+  const wall = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({ color: 0x777777 })
+  );
+  wall.position.set(x, h / 2, z);
+  scene.add(wall);
+  colliders.push(wall);
 }
 
-function wall(w, h, d, x, z) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
-  m.position.set(x, h / 2, z);
-  scene.add(m);
-  colliders.push(new THREE.Box3().setFromObject(m));
+function createWallVertical(x, z, d, h = 3, w = 0.5) {
+  const wall = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({ color: 0x777777 })
+  );
+  wall.position.set(x, h / 2, z);
+  scene.add(wall);
+  colliders.push(wall);
 }
 
-// =================== Medidas ===================
-const ROOM = 10;
-const CORR = 4;
-const WALL = 0.5;
-const H = 4;
-const DIST = ROOM + CORR;
-
-// =================== Sala ===================
-function createRoom(cx, cz, open) {
-  floor(ROOM, ROOM, cx, cz);
-
-  if (!open.n) wall(ROOM, H, WALL, cx, cz - ROOM / 2);
-  if (!open.s) wall(ROOM, H, WALL, cx, cz + ROOM / 2);
-  if (!open.w) wall(WALL, H, ROOM, cx - ROOM / 2, cz);
-  if (!open.e) wall(WALL, H, ROOM, cx + ROOM / 2, cz);
+function createCorridor(x, z, w, d) {
+  const corridor = new THREE.Mesh(
+    new THREE.BoxGeometry(w, 2.5, d),
+    new THREE.MeshStandardMaterial({ color: 0x555555 })
+  );
+  corridor.position.set(x, 1.25, z);
+  scene.add(corridor);
+  colliders.push(corridor);
 }
 
-// =================== Corredor Horizontal ===================
-function corridorH(cx, cz) {
-  const len = ROOM + CORR;
-  floor(len, CORR, cx, cz);
-
-  wall(len, H, WALL, cx, cz - CORR / 2);
-  wall(len, H, WALL, cx, cz + CORR / 2);
+/* =========================
+   SALA
+========================= */
+class Room {
+  constructor(x, z, w, h) {
+    this.x = x;
+    this.z = z;
+    this.w = w;
+    this.h = h;
+    this.door = null;
+  }
 }
 
-// =================== Corredor Vertical ===================
-function corridorV(cx, cz) {
-  const len = ROOM + CORR;
-  floor(CORR, len, cx, cz);
+/* =========================
+   PORTA (CENTRO DA PAREDE)
+========================= */
+function createDoor(room) {
+  const side = Math.floor(Math.random() * 4); // 0 N | 1 S | 2 E | 3 W
 
-  wall(WALL, H, len, cx - CORR / 2, cz);
-  wall(WALL, H, len, cx + CORR / 2, cz);
+  switch (side) {
+    case 0:
+      room.door = { x: room.x, z: room.z - room.h / 2, dir: 'N' };
+      break;
+    case 1:
+      room.door = { x: room.x, z: room.z + room.h / 2, dir: 'S' };
+      break;
+    case 2:
+      room.door = { x: room.x + room.w / 2, z: room.z, dir: 'E' };
+      break;
+    case 3:
+      room.door = { x: room.x - room.w / 2, z: room.z, dir: 'W' };
+      break;
+  }
 }
 
-// =================== Construção ===================
+/* =========================
+   CONSTRUIR SALA (4 PAREDES)
+========================= */
+function buildRoom(room) {
+  const t = 0.5;
 
-// Salas
-createRoom(-DIST, -DIST, { e: true, s: true });
-createRoom( DIST, -DIST, { w: true, s: true });
-createRoom(-DIST,  DIST, { e: true, n: true });
-createRoom( DIST,  DIST, { w: true, n: true });
+  // Norte
+  if (room.door.dir !== 'N')
+    createWall(room.x, room.z - room.h / 2, room.w);
 
-// Corredores
-corridorH(0, -DIST);
-corridorH(0,  DIST);
-corridorV(-DIST, 0);
-corridorV( DIST, 0);
+  // Sul
+  if (room.door.dir !== 'S')
+    createWall(room.x, room.z + room.h / 2, room.w);
 
-// =================== Input ===================
+  // Leste
+  if (room.door.dir !== 'E')
+    createWallVertical(room.x + room.w / 2, room.z, room.h);
+
+  // Oeste
+  if (room.door.dir !== 'W')
+    createWallVertical(room.x - room.w / 2, room.z, room.h);
+}
+
+/* =========================
+   CORREDOR CONECTADO À PORTA
+========================= */
+function buildCorridor(room) {
+  const len = 10;
+  const w = 2;
+  const d = room.door;
+
+  switch (d.dir) {
+    case 'N':
+      createCorridor(d.x, d.z - len / 2, w, len);
+      break;
+    case 'S':
+      createCorridor(d.x, d.z + len / 2, w, len);
+      break;
+    case 'E':
+      createCorridor(d.x + len / 2, d.z, len, w);
+      break;
+    case 'W':
+      createCorridor(d.x - len / 2, d.z, len, w);
+      break;
+  }
+}
+
+/* =========================
+   GERAR MAPA
+========================= */
+const room = new Room(0, 0, 12, 10);
+createDoor(room);
+buildRoom(room);
+buildCorridor(room);
+
+/* =========================
+   MOVIMENTO
+========================= */
+const velocity = new THREE.Vector3();
+const direction = new THREE.Vector3();
 const keys = {};
+
 document.addEventListener('keydown', e => keys[e.code] = true);
 document.addEventListener('keyup', e => keys[e.code] = false);
-document.body.addEventListener('click', () => document.body.requestPointerLock());
 
-let yaw = 0, pitch = 0;
-document.addEventListener('mousemove', e => {
-  if (document.pointerLockElement !== document.body) return;
-  yaw -= e.movementX * 0.002;
-  pitch -= e.movementY * 0.002;
-  pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
-});
-
-// =================== Colisão ===================
-function collides(pos) {
-  const box = new THREE.Box3(
-    new THREE.Vector3(pos.x - PLAYER_RADIUS, 0, pos.z - PLAYER_RADIUS),
-    new THREE.Vector3(pos.x + PLAYER_RADIUS, 2, pos.z + PLAYER_RADIUS)
-  );
-  return colliders.some(c => c.intersectsBox(box));
-}
-
-// =================== Movimento ===================
-const clock = new THREE.Clock();
-const SPEED = 5;
-
-function move(dt) {
-  const dir = new THREE.Vector3();
-  camera.getWorldDirection(dir);
-  dir.y = 0;
-  dir.normalize();
-
-  const right = new THREE.Vector3().crossVectors(dir, camera.up).normalize();
-  const vel = new THREE.Vector3();
-
-  if (keys.KeyW) vel.add(dir);
-  if (keys.KeyS) vel.sub(dir);
-  if (keys.KeyA) vel.sub(right);
-  if (keys.KeyD) vel.add(right);
-
-  if (!vel.lengthSq()) return;
-  vel.normalize().multiplyScalar(SPEED * dt);
-
-  const nx = camera.position.clone(); nx.x += vel.x;
-  if (!collides(nx)) camera.position.x = nx.x;
-
-  const nz = camera.position.clone(); nz.z += vel.z;
-  if (!collides(nz)) camera.position.z = nz.z;
-
-  camera.rotation.order = 'YXZ';
-  camera.rotation.y = yaw;
-  camera.rotation.x = pitch;
-}
-
-// =================== Loop ===================
+/* =========================
+   LOOP
+========================= */
 function animate() {
   requestAnimationFrame(animate);
-  move(clock.getDelta());
+
+  direction.set(0, 0, 0);
+  if (keys['KeyW']) direction.z -= 1;
+  if (keys['KeyS']) direction.z += 1;
+  if (keys['KeyA']) direction.x -= 1;
+  if (keys['KeyD']) direction.x += 1;
+  direction.normalize();
+
+  controls.moveRight(direction.x * 0.08);
+  controls.moveForward(direction.z * 0.08);
+
   renderer.render(scene, camera);
 }
+
 animate();
