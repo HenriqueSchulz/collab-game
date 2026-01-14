@@ -18,10 +18,8 @@ scene.add(new THREE.AmbientLight(0xffffff, 0.45));
 
 // =================== Texturas ===================
 const loader = new THREE.TextureLoader();
-
 const wallTex = loader.load('../textures/stone_wall.jpg');
 wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping;
-
 const floorTex = loader.load('../textures/floor.jpg');
 floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
 
@@ -48,15 +46,15 @@ function wall(w, h, d, x, z) {
   colliders.push(new THREE.Box3().setFromObject(m));
 }
 
-// =================== Blocos ===================
+// =================== Medidas ===================
 const ROOM = 10;
 const CORR = 4;
 const WALL = 0.5;
 const H = 4;
-const OFFSET = ROOM + CORR;
+const DIST = ROOM + CORR;
 
 // =================== Sala ===================
-function createRoom(cx, cz, open = {}) {
+function createRoom(cx, cz, open) {
   floor(ROOM, ROOM, cx, cz);
 
   if (!open.n) wall(ROOM, H, WALL, cx, cz - ROOM / 2);
@@ -65,33 +63,37 @@ function createRoom(cx, cz, open = {}) {
   if (!open.e) wall(WALL, H, ROOM, cx + ROOM / 2, cz);
 }
 
-// =================== Corredor horizontal ===================
+// =================== Corredor Horizontal ===================
 function corridorH(cx, cz) {
-  floor(CORR, ROOM / 2, cx, cz);
-  wall(CORR, H, WALL, cx, cz - ROOM / 4);
-  wall(CORR, H, WALL, cx, cz + ROOM / 4);
+  const len = ROOM + CORR;
+  floor(len, CORR, cx, cz);
+
+  wall(len, H, WALL, cx, cz - CORR / 2);
+  wall(len, H, WALL, cx, cz + CORR / 2);
 }
 
-// =================== Corredor vertical ===================
+// =================== Corredor Vertical ===================
 function corridorV(cx, cz) {
-  floor(ROOM / 2, CORR, cx, cz);
-  wall(WALL, H, CORR, cx - ROOM / 4, cz);
-  wall(WALL, H, CORR, cx + ROOM / 4, cz);
+  const len = ROOM + CORR;
+  floor(CORR, len, cx, cz);
+
+  wall(WALL, H, len, cx - CORR / 2, cz);
+  wall(WALL, H, len, cx + CORR / 2, cz);
 }
 
-// =================== Construção do mapa ===================
+// =================== Construção ===================
 
-// SALAS
-createRoom(-OFFSET, -OFFSET, { e: true, s: true }); // Sala 1
-createRoom( OFFSET, -OFFSET, { w: true, s: true }); // Sala 2
-createRoom(-OFFSET,  OFFSET, { e: true, n: true }); // Sala 3
-createRoom( OFFSET,  OFFSET, { w: true, n: true }); // Sala 4
+// Salas
+createRoom(-DIST, -DIST, { e: true, s: true });
+createRoom( DIST, -DIST, { w: true, s: true });
+createRoom(-DIST,  DIST, { e: true, n: true });
+createRoom( DIST,  DIST, { w: true, n: true });
 
-// CORREDORES
-corridorH(0, -OFFSET); // entre 1 e 2
-corridorH(0,  OFFSET); // entre 3 e 4
-corridorV(-OFFSET, 0); // entre 1 e 3
-corridorV( OFFSET, 0); // entre 2 e 4
+// Corredores
+corridorH(0, -DIST);
+corridorH(0,  DIST);
+corridorV(-DIST, 0);
+corridorV( DIST, 0);
 
 // =================== Input ===================
 const keys = {};
