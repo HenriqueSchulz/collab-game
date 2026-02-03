@@ -14,8 +14,8 @@ export function move(camera, keys, dt) {
 
   const vel = new THREE.Vector3();
 
-  if (keys.KeyW) vel.add(dir);
-  if (keys.KeyS) vel.sub(dir);
+  if (keys.KeyW) vel.sub(dir);
+  if (keys.KeyS) vel.add(dir);
   if (keys.KeyA) vel.sub(right);
   if (keys.KeyD) vel.add(right);
 
