@@ -1,4 +1,4 @@
-import * as THREE from '../libs/three.module.js';
+import * as THREE from '../../libs/three.module.js';
 import { collides } from '../world/colliders.js';
 import { PLAYER_RADIUS, SPEED } from '../world/constants.js';
 

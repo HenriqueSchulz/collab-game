@@ -1,4 +1,4 @@
-import * as THREE from '../libs/three.module.js';
+import * as THREE from '../../libs/three.module.js';
 
 export const camera = new THREE.PerspectiveCamera(
   75,

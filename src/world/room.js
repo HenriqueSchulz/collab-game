@@ -1,4 +1,4 @@
-import * as THREE from '../libs/three.module.js';
+import * as THREE from '../../libs/three.module.js';
 import { wallMat, floorMat } from './materials.js';
 import { addCollider } from './colliders.js';
 import { ROOM_SIZE, ROOM_HEIGHT, WALL_THICKNESS, DOOR_WIDTH } from './constants.js';

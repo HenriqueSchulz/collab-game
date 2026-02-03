@@ -1,4 +1,4 @@
-import * as THREE from '../libs/three.module.js';
+import * as THREE from '../../libs/three.module.js';
 
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x111111);
