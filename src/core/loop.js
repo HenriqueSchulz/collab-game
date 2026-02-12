@@ -13,9 +13,12 @@ export function onUpdate(fn) {
 export function startLoop() {
   function animate() {
     requestAnimationFrame(animate);
-    const dt = clock.getDelta();
+
+    const dt = Math.min(clock.getDelta(), 0.033); // trava picos de delta
+
     callbacks.forEach(fn => fn(dt));
     renderer.render(scene, camera);
   }
+
   animate();
 }

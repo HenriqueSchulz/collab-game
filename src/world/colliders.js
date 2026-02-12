@@ -7,13 +7,18 @@ export function addCollider(mesh) {
 }
 
 export function collides(pos, radius) {
+
   const playerBox = new THREE.Box3(
     new THREE.Vector3(pos.x - radius, 0, pos.z - radius),
     new THREE.Vector3(pos.x + radius, 2, pos.z + radius)
   );
 
-  return colliders.some(mesh => {
+  for (const mesh of colliders) {
     const box = new THREE.Box3().setFromObject(mesh);
-    return box.intersectsBox(playerBox);
-  });
+    if (box.intersectsBox(playerBox)) {
+      return true;
+    }
+  }
+
+  return false;
 }
