@@ -2,7 +2,7 @@ import * as THREE from '../../libs/three.module.js';
 import { collides } from '../world/colliders.js';
 import { PLAYER_RADIUS } from '../world/constants.js';
 
-const MOVE_SPEED = 2.5; // velocidade lenta e constante
+const MOVE_SPEED = 4.5; // velocidade lenta e constante
 
 export function updatePlayer(camera, keys, yaw, pitch, dt) {
 
